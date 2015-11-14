@@ -4,6 +4,7 @@ module Control.Monad.Morph where
 import Prelude
 
 import Control.Monad.Trans (MonadTrans, lift)
+import qualified Control.Monad.Cont.Trans as C
 import qualified Control.Monad.Except.Trans as E
 import qualified Control.Monad.Maybe.Trans as M
 import qualified Control.Monad.Reader.Trans as R
@@ -11,6 +12,7 @@ import qualified Control.Monad.RWS.Trans as RWS
 import qualified Control.Monad.State.Trans as S
 import qualified Control.Monad.Writer.Trans as W
 import qualified Control.Monad.List.Trans as L
+import qualified Control.Monad.Free.Trans as F
 
 import Data.Monoid (Monoid)
 import Data.Either (Either(Left, Right))
@@ -18,8 +20,51 @@ import Data.Maybe (Maybe(Just, Nothing))
 import Data.Functor.Compose (Compose(Compose))
 import Data.Identity (runIdentity, Identity(Identity))
 import Data.Functor.Product (Product(Product))
+import Data.Functor.Coproduct (Coproduct(Coproduct))
 import Data.Tuple (Tuple(Tuple))
 import Data.NaturalTransformation (Natural())
+
+class MInvariant t where
+  ihoist :: forall m n. (Monad m, Monad n) => Natural m n -> Natural n m -> Natural (t m) (t n)
+
+ihoistF :: forall t m n. (MFunctor t, Monad m) => Natural m n -> Natural n m -> Natural (t m) (t n)
+ihoistF f _ = hoist f
+
+instance minvariantContT :: MInvariant (C.ContT r) where
+  ihoist f g a = C.ContT \cont -> f (C.runContT a (g <<< cont))
+
+instance minvariantExceptT :: MInvariant (E.ExceptT e) where
+  ihoist = ihoistF
+
+-- instance minvariantListT :: MInvariant L.ListT where
+  --hoist = ihoistF
+
+instance minvariantMaybeT :: MInvariant M.MaybeT where
+  ihoist = ihoistF
+
+instance minvariantReaderT :: MInvariant (R.ReaderT r) where
+  ihoist = ihoistF
+
+instance minvariantWriterT :: MInvariant (W.WriterT w) where
+  ihoist = ihoistF
+
+instance minvariantStateT :: MInvariant (S.StateT s) where
+  ihoist = ihoistF
+
+instance minvariantRWST :: MInvariant (RWS.RWST r w s) where
+  ihoist = ihoistF
+
+instance minvariantCompose :: (Functor f) => MInvariant (Compose f) where
+  ihoist = ihoistF
+
+instance minvariantProduct :: MInvariant (Product f) where
+  ihoist = ihoistF
+
+instance minvariantCoproduct :: MInvariant (Coproduct f) where
+  ihoist = ihoistF
+
+instance minvariantFreeT :: (Functor f) => MInvariant (F.FreeT f) where
+  ihoist f _ = F.hoistFreeT f
 
 class MFunctor t where
   hoist :: forall m n. (Monad m) => Natural m n -> Natural (t m) (t n)
@@ -27,10 +72,10 @@ class MFunctor t where
 instance mfunctorExceptT :: MFunctor (E.ExceptT e) where
   hoist nat m = E.ExceptT (nat (E.runExceptT m))
 
---instance mfunctorList :: MFunctor L.ListT where
+--instance mfunctorListT :: MFunctor L.ListT where
   --hoist nat m = L.ListT (nat (L.runListT m))
 
-instance mfunctorMaybe :: MFunctor M.MaybeT where
+instance mfunctorMaybeT :: MFunctor M.MaybeT where
   hoist nat m = M.MaybeT (nat (M.runMaybeT m))
 
 instance mfunctorReaderT :: MFunctor (R.ReaderT r) where
@@ -42,7 +87,7 @@ instance mfunctorWriterT :: MFunctor (W.WriterT w) where
 instance mfunctorStateT :: MFunctor (S.StateT s) where
   hoist nat m = S.StateT (\ s -> nat (S.runStateT m s))
 
-instance mfunctorRWS :: MFunctor (RWS.RWST r w s) where
+instance mfunctorRWST :: MFunctor (RWS.RWST r w s) where
   hoist nat m = RWS.RWST (\ r s -> nat (RWS.runRWST m r s))
 
 instance mfunctorCompose :: (Functor f) => MFunctor (Compose f) where
@@ -50,6 +95,9 @@ instance mfunctorCompose :: (Functor f) => MFunctor (Compose f) where
 
 instance mfunctorProduct :: MFunctor (Product f) where
   hoist nat (Product (Tuple f g)) = Product (Tuple f (nat g))
+
+instance mfunctorCoproduct :: MFunctor (Coproduct f) where
+  hoist nat (Coproduct a) = Coproduct (map nat a)
 
 generalize :: forall m a. (Monad m) => Identity a -> m a
 generalize = pure <<< runIdentity
