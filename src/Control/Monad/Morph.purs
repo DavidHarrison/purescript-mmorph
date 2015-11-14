@@ -19,9 +19,10 @@ import Data.Functor.Compose (Compose(Compose))
 import Data.Identity (runIdentity, Identity(Identity))
 import Data.Functor.Product (Product(Product))
 import Data.Tuple (Tuple(Tuple))
+import Data.NaturalTransformation (Natural())
 
 class MFunctor t where
-  hoist :: forall m n a b. (Monad m) => (forall a. m a -> n a) -> t m b -> t n b
+  hoist :: forall m n. (Monad m) => Natural m n -> Natural (t m) (t n)
 
 instance mfunctorExceptT :: MFunctor (E.ExceptT e) where
   hoist nat m = E.ExceptT (nat (E.runExceptT m))

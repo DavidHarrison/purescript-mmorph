@@ -19,7 +19,8 @@
   "dependencies": {
     "purescript-transformers": "~0.8.1",
     "purescript-functor-compose": "~0.0.0",
-    "purescript-functors": "~0.1.0"
+    "purescript-functors": "~0.1.0",
+    "purescript-free": "~0.9.0"
   },
   "devDependencies": {
     "purescript-console": "~0.1.1"
