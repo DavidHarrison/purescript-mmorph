@@ -24,9 +24,21 @@ import Data.Functor.Coproduct (Coproduct(Coproduct))
 import Data.Tuple (Tuple(Tuple))
 import Data.NaturalTransformation (Natural())
 
+-- | A `MInvariant` is an invariant functor in the category of monads,
+-- | using `ihoist` as the analog of
+-- | [`imap`](http://pursuit.purescript.org/packages/purescript-invariant/0.3.0/docs/Data.Functor.Invariant#v:imap).
+-- |
+-- | Instances must satisfy the following laws:
+-- |
+-- | - Identity: `ihoist id id = id`
+-- | - Composition: `ihoist g1 g2 <<< ihoist f1 f2 = ihoist (g1 <<< f1) (f2 <<< g2)`
+-- |
 class MInvariant t where
   ihoist :: forall m n. (Monad m, Monad n) => Natural m n -> Natural n m -> Natural (t m) (t n)
 
+-- | As all `MFunctor`s are also trivially `MInvariant`, this function can be
+-- | used as the `ihoist` implementation for all `MInvariant` instances for
+-- | `MFunctors`.
 ihoistF :: forall t m n. (MFunctor t, Monad m) => Natural m n -> Natural n m -> Natural (t m) (t n)
 ihoistF f _ = hoist f
 
@@ -66,6 +78,14 @@ instance minvariantCoproduct :: MInvariant (Coproduct f) where
 instance minvariantFreeT :: (Functor f) => MInvariant (F.FreeT f) where
   ihoist f _ = F.hoistFreeT f
 
+-- | A `MFunctor` is a functor in the category of monads,
+-- | using `hoist` as the analog of `map`.
+-- |
+-- | Instances must satisfy the following laws:
+-- |
+-- | - Identity: `hoist id = id`
+-- | - Composition: `hoist (f <<< g) = hoist f <<< hoist g`
+-- |
 class MFunctor t where
   hoist :: forall m n. (Monad m) => Natural m n -> Natural (t m) (t n)
 
@@ -99,13 +119,24 @@ instance mfunctorProduct :: MFunctor (Product f) where
 instance mfunctorCoproduct :: MFunctor (Coproduct f) where
   hoist nat (Coproduct a) = Coproduct (map nat a)
 
-generalize :: forall m a. (Monad m) => Identity a -> m a
+generalize :: forall m. (Monad m) => Natural Identity m
 generalize = pure <<< runIdentity
 
+-- | A `MMonad` is a functor in the category of monads,
+-- | using `embed` as the analog of `bind`.
+-- |
+-- | Instances must satisfy the following laws in addition to the
+-- | `MFunctor` and `MonadTrans` laws:
+-- |
+-- | - TODO: Associative composition: `(hoist (<<<) f) <*> g <*> h = f <*> (g <*> h)`
+-- | - Associativity: `embed g (embed f x) = embed (\k -> embed g (f k)) x`
+-- | - Left Identity: `embed f (lift x) = f x`
+-- | - Right Identity: `embed lift x = x`
+-- |
 class (MFunctor t, MonadTrans t) <= MMonad t where
-  embed :: forall n m b. (Monad n) => (forall a. m a -> t n a) -> t m b -> t n b
+  embed :: forall n m. (Monad n) => Natural m (t n) -> Natural (t m) (t n)
 
-squash :: forall a m t. (Monad m, MMonad t) => t (t m) a -> t m a
+squash :: forall m t. (Monad m, MMonad t) => Natural (t (t m)) (t m)
 squash = embed id
 
 infixr 2 >|>
@@ -113,22 +144,22 @@ infixr 2 =<|
 infixl 2 <|<
 infixl 2 |>=
 
-(>|>) :: forall m1 m2 m3 t c. (MMonad t, Monad m3) => (forall a. m1 a -> t m2 a)
-                                                   -> (forall b. m2 b -> t m3 b)
-                                                   ->            m1 c -> t m3 c
+(>|>) :: forall m1 m2 m3 t. (MMonad t, Monad m3) => Natural m1 (t m2)
+                                                 -> Natural m2 (t m3)
+                                                 -> Natural m1 (t m3)
 (>|>) f g m = embed g (f m)
 
-(<|<) :: forall m1 m2 m3 t c. (MMonad t, Monad m3) => (forall b. m2 b -> t m3 b)
-                                                   -> (forall a. m1 a -> t m2 a)
-                                                   ->            m1 c -> t m3 c
+(<|<) :: forall m1 m2 m3 t. (MMonad t, Monad m3) => Natural m2 (t m3)
+                                                 -> Natural m1 (t m2)
+                                                 -> Natural m1 (t m3)
 (<|<) g f m = embed g (f m)
 
-(=<|) :: forall t m n b. (MMonad t, Monad n) => (forall a. m a -> t n a)
-                                             ->          t m b -> t n b
+(=<|) :: forall t m n. (MMonad t, Monad n) => Natural m (t n)
+                                           -> Natural (t m) (t n)
 (=<|) = embed
 
 (|>=) :: forall t m n b. (MMonad t, Monad n) => t m b
-                                             -> (forall a. m a -> t n a)
+                                             -> Natural m (t n)
                                              -> t n b
 (|>=) t f = embed f t
 
