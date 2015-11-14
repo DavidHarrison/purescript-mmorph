@@ -2,23 +2,52 @@
 
 A port of Haskell's [mmorph library](http://hackage.haskell.org/package/mmorph-1.0.0/docs/Control-Monad-Morph.html)
 
+#### `MInvariant`
+
+``` purescript
+class MInvariant t where
+  ihoist :: forall m n. (Monad m, Monad n) => Natural m n -> Natural n m -> Natural (t m) (t n)
+```
+
+##### Instances
+``` purescript
+instance minvariantContT :: MInvariant (ContT r)
+instance minvariantExceptT :: MInvariant (ExceptT e)
+instance minvariantMaybeT :: MInvariant MaybeT
+instance minvariantReaderT :: MInvariant (ReaderT r)
+instance minvariantWriterT :: MInvariant (WriterT w)
+instance minvariantStateT :: MInvariant (StateT s)
+instance minvariantRWST :: MInvariant (RWST r w s)
+instance minvariantCompose :: (Functor f) => MInvariant (Compose f)
+instance minvariantProduct :: MInvariant (Product f)
+instance minvariantCoproduct :: MInvariant (Coproduct f)
+instance minvariantFreeT :: (Functor f) => MInvariant (FreeT f)
+```
+
+#### `ihoistF`
+
+``` purescript
+ihoistF :: forall t m n. (MFunctor t, Monad m) => Natural m n -> Natural n m -> Natural (t m) (t n)
+```
+
 #### `MFunctor`
 
 ``` purescript
 class MFunctor t where
-  hoist :: forall m n a b. (Monad m) => (forall a. m a -> n a) -> t m b -> t n b
+  hoist :: forall m n. (Monad m) => Natural m n -> Natural (t m) (t n)
 ```
 
 ##### Instances
 ``` purescript
 instance mfunctorExceptT :: MFunctor (ExceptT e)
-instance mfunctorMaybe :: MFunctor MaybeT
+instance mfunctorMaybeT :: MFunctor MaybeT
 instance mfunctorReaderT :: MFunctor (ReaderT r)
 instance mfunctorWriterT :: MFunctor (WriterT w)
 instance mfunctorStateT :: MFunctor (StateT s)
-instance mfunctorRWS :: MFunctor (RWST r w s)
+instance mfunctorRWST :: MFunctor (RWST r w s)
 instance mfunctorCompose :: (Functor f) => MFunctor (Compose f)
 instance mfunctorProduct :: MFunctor (Product f)
+instance mfunctorCoproduct :: MFunctor (Coproduct f)
 ```
 
 #### `generalize`
